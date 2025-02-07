@@ -64,21 +64,20 @@ const imageUpload = multer({ storage: imageStorage });
 app.post("/upload-event", imageUpload.single("image"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
-  const { category, description } = req.body;
+  let { category, description } = req.body;
+  category = category || extractCategory(req.file.filename); // Ensure category is set
 
   try {
-    const timestamp = new Date(); // Ensure valid date
-
-    if (isNaN(timestamp.getTime())) {
-      return res.status(400).json({ error: "Invalid timestamp generated" });
-    }
+    const timestamp = parseTimestamp(req.file.filename); // Extract timestamp from filename
 
     const newEvent = await Event.create({
-      filename: req.file.filename,
-      category: category || "Auto-Detected",
+      filename: req.file.filename, // Store the image name, NOT timestamp
+      category: extractCategory(req.file.filename), // Should be "Fall Detection"
       description: description || "Newly detected event",
-      timestamp, // Ensure MySQL-friendly format
+      timestamp
     });
+    
+    
 
     res.json({ message: "Event image uploaded", event: newEvent });
   } catch (error) {
@@ -86,6 +85,7 @@ app.post("/upload-event", imageUpload.single("image"), async (req, res) => {
     res.status(500).json({ error: "Error saving event metadata" });
   }
 });
+
 
 
 // API Route to fetch event images with metadata (sorted by latest first)
@@ -138,7 +138,12 @@ const parseTimestamp = (filename) => {
 
 
 
-// Function to scan and update database with new images
+const extractCategory = (filename) => {
+  const match = filename.match(/_(Fall_Detection,People_Counting,Pet_Counting,Illegal_Parking,Illegal_Dumping,Loitering,Customized_Detection)_/);
+  return match ? match[1].replace("_", " ") : "Auto-Detected";
+};
+
+
 const scanOutputImages = async () => {
   fs.readdir(outputDir, async (err, files) => {
     if (err) return console.error("Error reading output directory:", err);
@@ -146,18 +151,22 @@ const scanOutputImages = async () => {
     for (const file of files) {
       const exists = await Event.findOne({ where: { filename: file } });
       if (!exists) {
+        const category = extractCategory(file); // Ensure "Fall Detection" is correctly extracted
         const timestamp = parseTimestamp(file);
+
         await Event.create({
-          filename: file,
-          category: "Auto-Detected",
+          filename: file, // Store the actual image name
+          category,
           description: "Newly detected event",
           timestamp
         });
-        console.log(`📸 New event detected: ${file}`);
+
+        console.log(`📸 New event detected: ${file}, Category: ${category}`);
       }
     }
   });
 };
+
 
 // Run scan periodically (every 3 seconds)
 setInterval(scanOutputImages, 3000);
