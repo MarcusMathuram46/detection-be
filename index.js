@@ -139,9 +139,24 @@ const parseTimestamp = (filename) => {
 
 
 const extractCategory = (filename) => {
-  const match = filename.match(/_(Fall_Detection,People_Counting,Pet_Counting,Illegal_Parking,Illegal_Dumping,Loitering,Customized_Detection)_/);
-  return match ? match[1].replace("_", " ") : "Auto-Detected";
+  const categories = [
+    "Fall Detection",
+    "People Counting",
+    "Pet Counting",
+    "Illegal Parking",
+    "Illegal Dumping",
+    "Loitering",
+    "Customized Detection"
+  ];
+
+  // Create a regex pattern to match any of the categories
+  const pattern = categories.join("|").replace(/ /g, "_"); // Replace spaces with underscores for matching
+  const regex = new RegExp(`_(${pattern})_`);
+
+  const match = filename.match(regex);
+  return match ? match[1].replace(/_/g, " ") : "Auto-Detected";
 };
+
 
 
 const scanOutputImages = async () => {
